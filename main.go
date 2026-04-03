@@ -53,7 +53,7 @@ func newEntry(path string) (entry, error) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-a key | -d key]... [file ...]\n", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s [-C dir] [-a key | -d key]... [file ...]\n", progName)
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, `
 The key argument may be name, extension, size, or time.
@@ -68,6 +68,7 @@ func main() {
 	log.SetPrefix(progName + ": ")
 
 	var order []sortField
+	var baseDir string
 
 	addOrder := func(s string, desc bool) error {
 		var k sortKey
@@ -94,6 +95,7 @@ func main() {
 	}
 
 	flag.Usage = usage
+	flag.StringVar(&baseDir, "C", "", "resolve relative input names against `dir`")
 	flag.Func("a", "ascending sort `key`", func(s string) error {
 		return addOrder(s, false)
 	})
@@ -110,7 +112,7 @@ func main() {
 		flag.Usage()
 	}
 
-	ents := collectEntries(paths)
+	ents := collectEntries(paths, baseDir)
 	sortEntries(ents, order)
 
 	for _, e := range ents {
@@ -134,9 +136,12 @@ func inputPaths(args []string, r io.Reader) ([]string, error) {
 	return paths, s.Err()
 }
 
-func collectEntries(paths []string) []entry {
+func collectEntries(paths []string, baseDir string) []entry {
 	ents := make([]entry, 0, len(paths))
 	for _, p := range paths {
+		if baseDir != "" && !filepath.IsAbs(p) {
+			p = filepath.Join(baseDir, p)
+		}
 		e, err := newEntry(p)
 		if err != nil {
 			log.Println(err)
