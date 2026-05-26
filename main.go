@@ -112,11 +112,15 @@ func main() {
 		flag.Usage()
 	}
 
-	ents := collectEntries(paths, baseDir)
+	ents, allOk := collectEntries(paths, baseDir)
 	sortEntries(ents, order)
 
 	for _, e := range ents {
 		fmt.Println(e.path)
+	}
+
+	if !allOk {
+		os.Exit(1)
 	}
 }
 
@@ -136,8 +140,10 @@ func inputPaths(args []string, r io.Reader) ([]string, error) {
 	return paths, s.Err()
 }
 
-func collectEntries(paths []string, baseDir string) []entry {
+func collectEntries(paths []string, baseDir string) ([]entry, bool) {
 	ents := make([]entry, 0, len(paths))
+	ok := true
+
 	for _, p := range paths {
 		if baseDir != "" && !filepath.IsAbs(p) {
 			p = filepath.Join(baseDir, p)
@@ -145,11 +151,12 @@ func collectEntries(paths []string, baseDir string) []entry {
 		e, err := newEntry(p)
 		if err != nil {
 			log.Println(err)
+			ok = false
 			continue
 		}
 		ents = append(ents, e)
 	}
-	return ents
+	return ents, ok
 }
 
 func sortEntries(entries []entry, order []sortField) {
