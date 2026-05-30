@@ -53,13 +53,8 @@ func newEntry(path string) (entry, error) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-C dir] [-a key | -d key]... [file ...]\n", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s [-C dir] [-k key | -K key]... [file ...]\n", progName)
 	flag.PrintDefaults()
-	fmt.Fprintf(os.Stderr, `
-The key argument may be name, extension, size, or time.
-If no key is specified, name is used in ascending order.
-Multiple keys are applied in the order specified.
-`)
 	os.Exit(2)
 }
 
@@ -96,10 +91,14 @@ func main() {
 
 	flag.Usage = usage
 	flag.StringVar(&baseDir, "C", "", "resolve relative input names against `dir`")
-	flag.Func("a", "ascending sort `key`", func(s string) error {
+	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
+		"name, extension, size, or time. The -k and -K options\n"+
+		"may be specified multiple times; subsequent keys are\n"+
+		"compared when earlier keys compare equal. By default,\n"+
+		"fsort sorts by name.", func(s string) error {
 		return addOrder(s, false)
 	})
-	flag.Func("d", "descending sort `key`", func(s string) error {
+	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
 		return addOrder(s, true)
 	})
 	flag.Parse()

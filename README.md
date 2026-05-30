@@ -11,17 +11,17 @@ go install github.com/CatsDeservePets/fsort@latest
 ## Usage
 
 ```
-usage: fsort [-C dir] [-a key | -d key]... [file ...]
+usage: fsort [-C dir] [-k key | -K key]... [file ...]
   -C dir
-        resolve relative input names against dir
-  -a key
-        ascending sort key
-  -d key
-        descending sort key
-
-The key argument may be name, extension, size, or time.
-If no key is specified, name is used in ascending order.
-Multiple keys are applied in the order specified.
+    	resolve relative input names against dir
+  -K key
+    	same as -k, but sorts by key in descending order
+  -k key
+    	sort by key in ascending order. Key must be one of
+    	name, extension, size, or time. The -k and -K options
+    	may be specified multiple times; subsequent keys are
+    	compared when earlier keys compare equal. By default,
+    	fsort sorts by name.
 ```
 
 ## Examples
@@ -29,17 +29,17 @@ Multiple keys are applied in the order specified.
 Find the most recently modified log files:
 
 ```shell
-find /var/log -type f -name '*.log' | fsort -d time
+find /var/log -type f -name '*.log' | fsort -K time
 ```
 
 Find the largest archives in a directory tree:
 
 ```shell
-find . -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.iso' \) | fsort -d size
+find . -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.iso' \) | fsort -K size
 ```
 
 Sort images by type, then by name:
 
 ```shell
-fsort -a extension -a name *.jpg *.png *.gif *.webp
+fsort -k extension -k name *.jpg *.png *.gif *.webp
 ```
