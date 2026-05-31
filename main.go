@@ -31,29 +31,33 @@ type sortField struct {
 }
 
 type entry struct {
-	info      os.FileInfo
-	path      string
-	lowerName string
-	lowerExt  string
+	info    os.FileInfo
+	path    string
+	cmpName string
+	cmpExt  string
 }
 
-func newEntry(path string) (entry, error) {
+func newEntry(path string, fold bool) (entry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return entry{}, err
 	}
 	name := info.Name()
-	e := entry{
-		info:      info,
-		path:      path,
-		lowerName: strings.ToLower(name),
-		lowerExt:  strings.ToLower(filepath.Ext(name)),
+	ext := filepath.Ext(name)
+	if fold {
+		name = strings.ToUpper(name)
+		ext = strings.ToUpper(ext)
 	}
-	return e, nil
+	return entry{
+		info:    info,
+		path:    path,
+		cmpName: name,
+		cmpExt:  ext,
+	}, nil
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-C dir] [-k key | -K key]... [file ...]\n", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s [-f] [-C dir] [-k key | -K key]... [file ...]\n", progName)
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -62,8 +66,9 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix(progName + ": ")
 
-	var order []sortField
+	var fold bool
 	var baseDir string
+	var order []sortField
 
 	addOrder := func(s string, desc bool) error {
 		var k sortKey
@@ -90,6 +95,7 @@ func main() {
 	}
 
 	flag.Usage = usage
+	flag.BoolVar(&fold, "f", false, "fold lowercase characters to uppercase before comparison")
 	flag.StringVar(&baseDir, "C", "", "resolve relative input names against `dir`")
 	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
 		"name, extension, size, or time. The -k and -K options\n"+
@@ -111,7 +117,7 @@ func main() {
 		flag.Usage()
 	}
 
-	ents, allOk := collectEntries(paths, baseDir)
+	ents, allOk := collectEntries(paths, baseDir, fold)
 	sortEntries(ents, order)
 
 	for _, e := range ents {
@@ -139,7 +145,7 @@ func inputPaths(args []string, r io.Reader) ([]string, error) {
 	return paths, s.Err()
 }
 
-func collectEntries(paths []string, baseDir string) ([]entry, bool) {
+func collectEntries(paths []string, baseDir string, fold bool) ([]entry, bool) {
 	ents := make([]entry, 0, len(paths))
 	ok := true
 
@@ -147,7 +153,7 @@ func collectEntries(paths []string, baseDir string) ([]entry, bool) {
 		if baseDir != "" && !filepath.IsAbs(p) {
 			p = filepath.Join(baseDir, p)
 		}
-		e, err := newEntry(p)
+		e, err := newEntry(p, fold)
 		if err != nil {
 			log.Println(err)
 			ok = false
@@ -172,9 +178,9 @@ func compareEntries(a, b entry, order []sortField) int {
 		var n int
 		switch field.key {
 		case nameKey:
-			n = strings.Compare(a.lowerName, b.lowerName)
+			n = strings.Compare(a.cmpName, b.cmpName)
 		case extKey:
-			n = strings.Compare(a.lowerExt, b.lowerExt)
+			n = strings.Compare(a.cmpExt, b.cmpExt)
 		case sizeKey:
 			n = cmp.Compare(a.info.Size(), b.info.Size())
 		case mtimeKey:

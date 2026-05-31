@@ -11,11 +11,12 @@ go install github.com/CatsDeservePets/fsort@latest
 ## Usage
 
 ```
-usage: fsort [-C dir] [-k key | -K key]... [file ...]
+usage: fsort [-f] [-C dir] [-k key | -K key]... [file ...]
   -C dir
     	resolve relative input names against dir
   -K key
     	same as -k, but sorts by key in descending order
+  -f	fold lowercase characters to uppercase before comparison
   -k key
     	sort by key in ascending order. Key must be one of
     	name, extension, size, or time. The -k and -K options
