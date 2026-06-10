@@ -13,7 +13,7 @@ go install github.com/CatsDeservePets/fsort@latest
 ```
 usage: fsort [-f] [-C dir] [-k key | -K key]... [file ...]
   -C dir
-    	resolve relative input names against dir
+    	change to dir before resolving input names
   -K key
     	same as -k, but sorts by key in descending order
   -f	fold lowercase characters to uppercase before comparison

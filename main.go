@@ -67,7 +67,7 @@ func main() {
 	log.SetPrefix(progName + ": ")
 
 	var fold bool
-	var baseDir string
+	var workDir string
 	var order []sortField
 
 	addOrder := func(s string, desc bool) error {
@@ -96,7 +96,7 @@ func main() {
 
 	flag.Usage = usage
 	flag.BoolVar(&fold, "f", false, "fold lowercase characters to uppercase before comparison")
-	flag.StringVar(&baseDir, "C", "", "resolve relative input names against `dir`")
+	flag.StringVar(&workDir, "C", "", "change to `dir` before resolving input names")
 	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
 		"name, extension, size, or time. The -k and -K options\n"+
 		"may be specified multiple times; subsequent keys are\n"+
@@ -117,7 +117,13 @@ func main() {
 		flag.Usage()
 	}
 
-	ents, allOk := collectEntries(paths, baseDir, fold)
+	if workDir != "" {
+		if err := os.Chdir(workDir); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	ents, allOk := collectEntries(paths, fold)
 	sortEntries(ents, order)
 
 	for _, e := range ents {
@@ -145,14 +151,11 @@ func inputPaths(args []string, r io.Reader) ([]string, error) {
 	return paths, s.Err()
 }
 
-func collectEntries(paths []string, baseDir string, fold bool) ([]entry, bool) {
+func collectEntries(paths []string, fold bool) ([]entry, bool) {
 	ents := make([]entry, 0, len(paths))
 	ok := true
 
 	for _, p := range paths {
-		if baseDir != "" && !filepath.IsAbs(p) {
-			p = filepath.Join(baseDir, p)
-		}
 		e, err := newEntry(p, fold)
 		if err != nil {
 			log.Println(err)
