@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
@@ -109,7 +110,11 @@ func main() {
 	})
 	flag.Parse()
 
-	paths, err := inputPaths(flag.Args(), os.Stdin)
+	args := flag.Args()
+	if runtime.GOOS == "windows" {
+		args = expandGlobs(args)
+	}
+	paths, err := inputPaths(args, os.Stdin)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -200,4 +205,18 @@ func compareEntries(a, b entry, order []sortField) int {
 	}
 
 	return 0
+}
+
+// expandGlobs expands wildcards in args using [filepath.Glob].
+// If an argument returns no matches, it is left unchanged.
+func expandGlobs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, pattern := range args {
+		if matches, _ := filepath.Glob(pattern); len(matches) > 0 {
+			out = append(out, matches...)
+		} else {
+			out = append(out, pattern)
+		}
+	}
+	return out
 }
