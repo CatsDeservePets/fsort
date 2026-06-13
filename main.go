@@ -119,7 +119,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(paths) == 0 {
-		flag.Usage()
+		return
 	}
 
 	if workDir != "" {
