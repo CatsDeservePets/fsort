@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"cmp"
 	"errors"
 	"flag"
@@ -58,7 +57,7 @@ func newEntry(path string, fold bool) (entry, error) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-f] [-C dir] [-k key | -K key]... [file ...]\n", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s [-f] [-z] [-C dir] [-k key | -K key]... [file ...]\n", progName)
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -67,7 +66,7 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix(progName + ": ")
 
-	var fold bool
+	var fold, zero bool
 	var workDir string
 	var order []sortField
 
@@ -97,6 +96,7 @@ func main() {
 
 	flag.Usage = usage
 	flag.BoolVar(&fold, "f", false, "fold lowercase characters to uppercase before comparison")
+	flag.BoolVar(&zero, "z", false, "line delimiter is NUL, not newline")
 	flag.StringVar(&workDir, "C", "", "change to `dir` before resolving input names")
 	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
 		"name, extension, size, or time. The -k and -K options\n"+
@@ -114,7 +114,13 @@ func main() {
 	if runtime.GOOS == "windows" {
 		args = expandGlobs(args)
 	}
-	paths, err := inputPaths(args, os.Stdin)
+
+	delim := "\n"
+	if zero {
+		delim = "\x00"
+	}
+
+	paths, err := inputPaths(args, os.Stdin, delim)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -132,7 +138,7 @@ func main() {
 	sortEntries(ents, order)
 
 	for _, e := range ents {
-		fmt.Println(e.path)
+		fmt.Print(e.path, delim)
 	}
 
 	if !allOk {
@@ -140,20 +146,27 @@ func main() {
 	}
 }
 
-func inputPaths(args []string, r io.Reader) ([]string, error) {
+func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
 	if len(args) > 0 {
 		return args, nil
 	}
 
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
 	var paths []string
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		if p := s.Text(); p != "" {
+	for p := range strings.SplitSeq(string(b), delim) {
+		if delim == "\n" {
+			p = strings.TrimSuffix(p, "\r")
+		}
+		if p != "" {
 			paths = append(paths, p)
 		}
 	}
 
-	return paths, s.Err()
+	return paths, nil
 }
 
 func collectEntries(paths []string, fold bool) ([]entry, bool) {

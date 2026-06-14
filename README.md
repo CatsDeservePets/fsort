@@ -11,7 +11,7 @@ go install github.com/CatsDeservePets/fsort@latest
 ## Usage
 
 ```
-usage: fsort [-f] [-C dir] [-k key | -K key]... [file ...]
+usage: fsort [-f] [-z] [-C dir] [-k key | -K key]... [file ...]
   -C dir
     	change to dir before resolving input names
   -K key
@@ -23,6 +23,7 @@ usage: fsort [-f] [-C dir] [-k key | -K key]... [file ...]
     	may be specified multiple times; subsequent keys are
     	compared when earlier keys compare equal. By default,
     	fsort sorts by name.
+  -z	line delimiter is NUL, not newline
 ```
 
 ## Examples
