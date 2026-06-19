@@ -111,6 +111,7 @@ func main() {
 	flag.Parse()
 
 	args := flag.Args()
+	// Expand globs before -C, as a proper shell would.
 	if runtime.GOOS == "windows" {
 		args = expandGlobs(args)
 	}
