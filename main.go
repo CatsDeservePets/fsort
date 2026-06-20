@@ -20,9 +20,10 @@ type sortKey byte
 
 const (
 	nameKey sortKey = iota
+	pathKey
 	extKey
-	mtimeKey
 	sizeKey
+	mtimeKey
 )
 
 type sortField struct {
@@ -34,6 +35,7 @@ type entry struct {
 	info    os.FileInfo
 	path    string
 	cmpName string
+	cmpPath string
 	cmpExt  string
 }
 
@@ -42,17 +44,20 @@ func newEntry(path string, fold bool) (entry, error) {
 	if err != nil {
 		return entry{}, err
 	}
-	name := info.Name()
-	ext := filepath.Ext(name)
+	cmpName := info.Name()
+	cmpPath := path
+	cmpExt := filepath.Ext(cmpName)
 	if fold {
-		name = strings.ToUpper(name)
-		ext = strings.ToUpper(ext)
+		cmpName = strings.ToUpper(cmpName)
+		cmpPath = strings.ToUpper(cmpPath)
+		cmpExt = strings.ToUpper(cmpExt)
 	}
 	return entry{
 		info:    info,
 		path:    path,
-		cmpName: name,
-		cmpExt:  ext,
+		cmpName: cmpName,
+		cmpPath: cmpPath,
+		cmpExt:  cmpExt,
 	}, nil
 }
 
@@ -75,6 +80,8 @@ func main() {
 		switch s {
 		case "name":
 			k = nameKey
+		case "path":
+			k = pathKey
 		case "ext", "extension":
 			k = extKey
 		case "size":
@@ -82,7 +89,7 @@ func main() {
 		case "time", "mtime":
 			k = mtimeKey
 		default:
-			return errors.New("must be name, extension, size, or time")
+			return errors.New("must be name, path, extension, size, or time")
 		}
 
 		for _, field := range order {
@@ -99,10 +106,10 @@ func main() {
 	flag.BoolVar(&zero, "z", false, "line delimiter is NUL, not newline")
 	flag.StringVar(&workDir, "C", "", "change to `dir` before resolving input names")
 	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
-		"name, extension, size, or time. The -k and -K options\n"+
-		"may be specified multiple times; subsequent keys are\n"+
-		"compared when earlier keys compare equal. By default,\n"+
-		"fsort sorts by name.", func(s string) error {
+		"name, path, extension, size, or time. The -k and -K\n"+
+		"options may be specified multiple times; subsequent\n"+
+		"keys are compared when earlier keys compare equal.\n"+
+		"By default, fsort sorts by name.", func(s string) error {
 		return addOrder(s, false)
 	})
 	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
@@ -201,6 +208,8 @@ func compareEntries(a, b entry, order []sortField) int {
 		switch field.key {
 		case nameKey:
 			n = strings.Compare(a.cmpName, b.cmpName)
+		case pathKey:
+			n = strings.Compare(a.cmpPath, b.cmpPath)
 		case extKey:
 			n = strings.Compare(a.cmpExt, b.cmpExt)
 		case sizeKey:
