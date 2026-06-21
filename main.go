@@ -22,6 +22,7 @@ const (
 	nameKey sortKey = iota
 	pathKey
 	extKey
+	typeKey
 	sizeKey
 	mtimeKey
 )
@@ -37,6 +38,7 @@ type entry struct {
 	cmpName string
 	cmpPath string
 	cmpExt  string
+	cmpType uint8
 }
 
 func newEntry(path string, fold bool) (entry, error) {
@@ -58,6 +60,7 @@ func newEntry(path string, fold bool) (entry, error) {
 		cmpName: cmpName,
 		cmpPath: cmpPath,
 		cmpExt:  cmpExt,
+		cmpType: typeRank(info.Mode()),
 	}, nil
 }
 
@@ -84,12 +87,14 @@ func main() {
 			k = pathKey
 		case "ext", "extension":
 			k = extKey
+		case "type":
+			k = typeKey
 		case "size":
 			k = sizeKey
 		case "time", "mtime":
 			k = mtimeKey
 		default:
-			return errors.New("must be name, path, extension, size, or time")
+			return errors.New("must be name, path, extension, type, size, or time")
 		}
 
 		for _, field := range order {
@@ -106,10 +111,10 @@ func main() {
 	flag.BoolVar(&zero, "z", false, "line delimiter is NUL, not newline")
 	flag.StringVar(&workDir, "C", "", "change to `dir` before resolving input names")
 	flag.Func("k", "sort by `key` in ascending order. Key must be one of\n"+
-		"name, path, extension, size, or time. The -k and -K\n"+
-		"options may be specified multiple times; subsequent\n"+
-		"keys are compared when earlier keys compare equal.\n"+
-		"By default, fsort sorts by name.", func(s string) error {
+		"name, path, extension, type, size, or time. The -k\n"+
+		"and -K options may be specified multiple times;\n"+
+		"subsequent keys are compared when earlier keys compare\n"+
+		"equal. By default, fsort sorts by name.", func(s string) error {
 		return addOrder(s, false)
 	})
 	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
@@ -212,6 +217,8 @@ func compareEntries(a, b entry, order []sortField) int {
 			n = strings.Compare(a.cmpPath, b.cmpPath)
 		case extKey:
 			n = strings.Compare(a.cmpExt, b.cmpExt)
+		case typeKey:
+			n = cmp.Compare(a.cmpType, b.cmpType)
 		case sizeKey:
 			n = cmp.Compare(a.info.Size(), b.info.Size())
 		case mtimeKey:
@@ -242,4 +249,26 @@ func expandGlobs(args []string) []string {
 		}
 	}
 	return out
+}
+
+func typeRank(m os.FileMode) uint8 {
+	switch m.Type() {
+	case os.ModeDir:
+		return 0
+	case 0:
+		return 1
+	case os.ModeSymlink:
+		return 2
+	case os.ModeNamedPipe:
+		return 3
+	case os.ModeSocket:
+		return 4
+	case os.ModeDevice | os.ModeCharDevice:
+		return 5
+	case os.ModeDevice:
+		return 6
+	case os.ModeIrregular:
+		return 7
+	}
+	return 8
 }
