@@ -18,11 +18,11 @@ usage: fsort [-f] [-z] [-C dir] [-k key | -K key]... [file ...]
     	same as -k, but sorts by key in descending order
   -f	fold lowercase characters to uppercase before comparison
   -k key
-    	sort by key in ascending order. Key must be one of
-    	name, path, extension, type, size, or time. The -k
-    	and -K options may be specified multiple times;
-    	subsequent keys are compared when earlier keys compare
-    	equal. By default, fsort sorts by name.
+    	sort by key in ascending order. Key must be one of name,
+    	path, extension, type, perm, size, or time. The -k and -K
+    	options may be specified multiple times; subsequent keys
+    	are compared when earlier keys compare equal. By default,
+    	fsort sorts by name.
   -z	line delimiter is NUL, not newline
 ```
 
