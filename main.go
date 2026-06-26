@@ -14,8 +14,6 @@ import (
 	"strings"
 )
 
-var progName = strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
-
 type sortKey byte
 
 const (
@@ -66,14 +64,14 @@ func newEntry(path string, fold bool) (entry, error) {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-f] [-z] [-C dir] [-k key | -K key]... [file ...]\n", progName)
+	fmt.Fprintln(os.Stderr, "usage: fsort [-f] [-z] [-C dir] [-k key | -K key]... [file ...]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
 
 func main() {
 	log.SetFlags(0)
-	log.SetPrefix(progName + ": ")
+	log.SetPrefix("fsort: ")
 
 	var fold, zero bool
 	var workDir string
