@@ -11,7 +11,7 @@ go install github.com/CatsDeservePets/fsort@latest
 ## Usage
 
 ```
-usage: fsort [-f] [-z] [-C dir] [-k key | -K key]... [file ...]
+usage: fsort [-f] [-z] [-C dir] [-k key | -K key] ... [file ...]
   -C dir
     	change to dir before resolving input names
   -K key

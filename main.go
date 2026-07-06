@@ -64,7 +64,7 @@ func newEntry(path string, fold bool) (entry, error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: fsort [-f] [-z] [-C dir] [-k key | -K key]... [file ...]")
+	fmt.Fprintln(os.Stderr, "usage: fsort [-f] [-z] [-C dir] [-k key | -K key] ... [file ...]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
