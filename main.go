@@ -27,9 +27,11 @@ const (
 )
 
 type sortField struct {
-	key  sortKey
-	desc bool
+	key        sortKey
+	descending bool
 }
+
+type sortFields []sortField
 
 type entry struct {
 	info    os.FileInfo
@@ -75,35 +77,35 @@ func main() {
 
 	var fold, zero bool
 	var workDir string
-	var order []sortField
+	var sortBy sortFields
 
-	addOrder := func(s string, desc bool) error {
-		var k sortKey
-		switch s {
+	addField := func(name string, desc bool) error {
+		var key sortKey
+		switch name {
 		case "name":
-			k = nameKey
+			key = nameKey
 		case "path":
-			k = pathKey
+			key = pathKey
 		case "ext", "extension":
-			k = extKey
+			key = extKey
 		case "type":
-			k = typeKey
+			key = typeKey
 		case "perm", "permission":
-			k = permKey
+			key = permKey
 		case "size":
-			k = sizeKey
+			key = sizeKey
 		case "time", "mtime":
-			k = mtimeKey
+			key = mtimeKey
 		default:
 			return errors.New("must be name, path, extension, type, perm, size, or time")
 		}
 
-		for _, field := range order {
-			if field.key == k {
+		for _, field := range sortBy {
+			if field.key == key {
 				return errors.New("key already specified")
 			}
 		}
-		order = append(order, sortField{k, desc})
+		sortBy = append(sortBy, sortField{key, desc})
 		return nil
 	}
 
@@ -116,10 +118,10 @@ func main() {
 		"options may be specified multiple times; subsequent keys\n"+
 		"are compared when earlier keys compare equal. By default,\n"+
 		"fsort sorts by name.", func(s string) error {
-		return addOrder(s, false)
+		return addField(s, false)
 	})
 	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
-		return addOrder(s, true)
+		return addField(s, true)
 	})
 	flag.Parse()
 
@@ -149,7 +151,7 @@ func main() {
 	}
 
 	ents, allOk := collectEntries(paths, fold)
-	sortEntries(ents, order)
+	sortEntries(ents, sortBy)
 
 	for _, e := range ents {
 		fmt.Print(e.path, delim)
@@ -199,17 +201,17 @@ func collectEntries(paths []string, fold bool) ([]entry, bool) {
 	return ents, ok
 }
 
-func sortEntries(entries []entry, order []sortField) {
-	if len(order) == 0 {
-		order = []sortField{{key: nameKey}}
+func sortEntries(entries []entry, fields sortFields) {
+	if len(fields) == 0 {
+		fields = sortFields{{key: nameKey}}
 	}
 	slices.SortStableFunc(entries, func(a, b entry) int {
-		return compareEntries(a, b, order)
+		return compareEntries(a, b, fields)
 	})
 }
 
-func compareEntries(a, b entry, order []sortField) int {
-	for _, field := range order {
+func compareEntries(a, b entry, fields sortFields) int {
+	for _, field := range fields {
 		var n int
 		switch field.key {
 		case nameKey:
@@ -230,7 +232,7 @@ func compareEntries(a, b entry, order []sortField) int {
 		switch {
 		case n == 0:
 			continue
-		case field.desc:
+		case field.descending:
 			return -n
 		default:
 			return n
