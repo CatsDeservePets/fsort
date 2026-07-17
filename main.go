@@ -33,6 +33,144 @@ type sortField struct {
 
 type sortFields []sortField
 
+func (f *sortFields) add(name string, desc bool) error {
+	var key sortKey
+	switch name {
+	case "name":
+		key = nameKey
+	case "path":
+		key = pathKey
+	case "ext", "extension":
+		key = extKey
+	case "type":
+		key = typeKey
+	case "perm", "permission":
+		key = permKey
+	case "size":
+		key = sizeKey
+	case "time", "mtime":
+		key = mtimeKey
+	default:
+		return errors.New("must be name, path, extension, type, perm, size, or time")
+	}
+
+	for _, field := range *f {
+		if field.key == key {
+			return errors.New("key already specified")
+		}
+	}
+	*f = append(*f, sortField{key, desc})
+	return nil
+}
+
+const keyHelp = `sort by %s in ascending order. Key must be one of name,
+path, extension, type, perm, size, or time. The -k and -K
+options may be specified multiple times; subsequent keys
+are compared when earlier keys compare equal. By default,
+fsort sorts by name.`
+
+var (
+	fold    = flag.Bool("f", false, "fold lowercase characters to uppercase before comparison")
+	zero    = flag.Bool("z", false, "line delimiter is NUL, not newline")
+	workDir = flag.String("C", "", "change to `dir` before resolving input names")
+	sortBy  sortFields
+)
+
+func init() {
+	flag.Func("k", fmt.Sprintf(keyHelp, "`key`"), func(s string) error {
+		return sortBy.add(s, false)
+	})
+	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
+		return sortBy.add(s, true)
+	})
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "usage: fsort [-f] [-z] [-C dir] [-k key | -K key] ... [file ...]")
+	flag.PrintDefaults()
+	os.Exit(2)
+}
+
+func main() {
+	log.SetFlags(0)
+	log.SetPrefix("fsort: ")
+	flag.Usage = usage
+	flag.Parse()
+
+	args := flag.Args()
+	// Expand globs before -C, as a proper shell would.
+	if runtime.GOOS == "windows" {
+		args = expandGlobs(args)
+	}
+
+	delim := "\n"
+	if *zero {
+		delim = "\x00"
+	}
+
+	paths, err := inputPaths(args, os.Stdin, delim)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(paths) == 0 {
+		return
+	}
+
+	if *workDir != "" {
+		if err := os.Chdir(*workDir); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	ents, allOk := collectEntries(paths, *fold)
+	sortEntries(ents, sortBy)
+
+	for _, e := range ents {
+		fmt.Print(e.path, delim)
+	}
+
+	if !allOk {
+		os.Exit(1)
+	}
+}
+
+// expandGlobs expands wildcards in args using [filepath.Glob].
+// If an argument returns no matches, it is left unchanged.
+func expandGlobs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for _, pattern := range args {
+		if matches, _ := filepath.Glob(pattern); len(matches) > 0 {
+			out = append(out, matches...)
+		} else {
+			out = append(out, pattern)
+		}
+	}
+	return out
+}
+
+func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
+	if len(args) > 0 {
+		return args, nil
+	}
+
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	for p := range strings.SplitSeq(string(b), delim) {
+		if delim == "\n" {
+			p = strings.TrimSuffix(p, "\r")
+		}
+		if p != "" {
+			paths = append(paths, p)
+		}
+	}
+
+	return paths, nil
+}
+
 type entry struct {
 	info    os.FileInfo
 	path    string
@@ -65,124 +203,26 @@ func newEntry(path string, fold bool) (entry, error) {
 	}, nil
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: fsort [-f] [-z] [-C dir] [-k key | -K key] ... [file ...]")
-	flag.PrintDefaults()
-	os.Exit(2)
-}
-
-func main() {
-	log.SetFlags(0)
-	log.SetPrefix("fsort: ")
-
-	var fold, zero bool
-	var workDir string
-	var sortBy sortFields
-
-	addField := func(name string, desc bool) error {
-		var key sortKey
-		switch name {
-		case "name":
-			key = nameKey
-		case "path":
-			key = pathKey
-		case "ext", "extension":
-			key = extKey
-		case "type":
-			key = typeKey
-		case "perm", "permission":
-			key = permKey
-		case "size":
-			key = sizeKey
-		case "time", "mtime":
-			key = mtimeKey
-		default:
-			return errors.New("must be name, path, extension, type, perm, size, or time")
-		}
-
-		for _, field := range sortBy {
-			if field.key == key {
-				return errors.New("key already specified")
-			}
-		}
-		sortBy = append(sortBy, sortField{key, desc})
-		return nil
+func typeRank(m os.FileMode) uint8 {
+	switch m.Type() {
+	case os.ModeDir:
+		return 0
+	case 0:
+		return 1
+	case os.ModeSymlink:
+		return 2
+	case os.ModeNamedPipe:
+		return 3
+	case os.ModeSocket:
+		return 4
+	case os.ModeDevice | os.ModeCharDevice:
+		return 5
+	case os.ModeDevice:
+		return 6
+	case os.ModeIrregular:
+		return 7
 	}
-
-	flag.Usage = usage
-	flag.BoolVar(&fold, "f", false, "fold lowercase characters to uppercase before comparison")
-	flag.BoolVar(&zero, "z", false, "line delimiter is NUL, not newline")
-	flag.StringVar(&workDir, "C", "", "change to `dir` before resolving input names")
-	flag.Func("k", "sort by `key` in ascending order. Key must be one of name,\n"+
-		"path, extension, type, perm, size, or time. The -k and -K\n"+
-		"options may be specified multiple times; subsequent keys\n"+
-		"are compared when earlier keys compare equal. By default,\n"+
-		"fsort sorts by name.", func(s string) error {
-		return addField(s, false)
-	})
-	flag.Func("K", "same as -k, but sorts by `key` in descending order", func(s string) error {
-		return addField(s, true)
-	})
-	flag.Parse()
-
-	args := flag.Args()
-	// Expand globs before -C, as a proper shell would.
-	if runtime.GOOS == "windows" {
-		args = expandGlobs(args)
-	}
-
-	delim := "\n"
-	if zero {
-		delim = "\x00"
-	}
-
-	paths, err := inputPaths(args, os.Stdin, delim)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(paths) == 0 {
-		return
-	}
-
-	if workDir != "" {
-		if err := os.Chdir(workDir); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	ents, allOk := collectEntries(paths, fold)
-	sortEntries(ents, sortBy)
-
-	for _, e := range ents {
-		fmt.Print(e.path, delim)
-	}
-
-	if !allOk {
-		os.Exit(1)
-	}
-}
-
-func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
-	if len(args) > 0 {
-		return args, nil
-	}
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var paths []string
-	for p := range strings.SplitSeq(string(b), delim) {
-		if delim == "\n" {
-			p = strings.TrimSuffix(p, "\r")
-		}
-		if p != "" {
-			paths = append(paths, p)
-		}
-	}
-
-	return paths, nil
+	return 8
 }
 
 func collectEntries(paths []string, fold bool) ([]entry, bool) {
@@ -240,40 +280,4 @@ func compareEntries(a, b entry, fields sortFields) int {
 	}
 
 	return 0
-}
-
-// expandGlobs expands wildcards in args using [filepath.Glob].
-// If an argument returns no matches, it is left unchanged.
-func expandGlobs(args []string) []string {
-	out := make([]string, 0, len(args))
-	for _, pattern := range args {
-		if matches, _ := filepath.Glob(pattern); len(matches) > 0 {
-			out = append(out, matches...)
-		} else {
-			out = append(out, pattern)
-		}
-	}
-	return out
-}
-
-func typeRank(m os.FileMode) uint8 {
-	switch m.Type() {
-	case os.ModeDir:
-		return 0
-	case 0:
-		return 1
-	case os.ModeSymlink:
-		return 2
-	case os.ModeNamedPipe:
-		return 3
-	case os.ModeSocket:
-		return 4
-	case os.ModeDevice | os.ModeCharDevice:
-		return 5
-	case os.ModeDevice:
-		return 6
-	case os.ModeIrregular:
-		return 7
-	}
-	return 8
 }
