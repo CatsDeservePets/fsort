@@ -14,6 +14,7 @@ import (
 	"strings"
 )
 
+// A sortKey specifies an attribute used to order entries.
 type sortKey byte
 
 const (
@@ -26,13 +27,18 @@ const (
 	mtimeKey
 )
 
+// A sortField holds a [sortKey] and its direction.
 type sortField struct {
-	key        sortKey
-	descending bool
+	key        sortKey // [entry] attribute to compare
+	descending bool    // whether greater values sort first
 }
 
+// sortFields represent the requested sort order.
 type sortFields []sortField
 
+// add parses name as a sort key and appends the resulting sort field to f.
+// If desc is true, the field sorts in descending order.
+// add returns an error if name is invalid or specifies a key already used.
 func (f *sortFields) add(name string, desc bool) error {
 	var key sortKey
 	switch name {
@@ -148,6 +154,8 @@ func expandGlobs(args []string) []string {
 	return out
 }
 
+// inputPaths returns args, if any.
+// Otherwise, it reads paths from r, using delim as the separator.
 func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
 	if len(args) > 0 {
 		return args, nil
@@ -171,6 +179,7 @@ func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
 	return paths, nil
 }
 
+// An entry is a path being sorted.
 type entry struct {
 	info    os.FileInfo
 	path    string
@@ -180,6 +189,8 @@ type entry struct {
 	cmpType uint8
 }
 
+// newEntry returns an entry for path without following symlinks.
+// If fold is true, it stores uppercase strings for comparisons.
 func newEntry(path string, fold bool) (entry, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -225,6 +236,8 @@ func typeRank(m os.FileMode) uint8 {
 	return 8
 }
 
+// collectEntries creates entries from paths.
+// It logs errors and returns false if any occurred.
 func collectEntries(paths []string, fold bool) ([]entry, bool) {
 	ents := make([]entry, 0, len(paths))
 	ok := true
@@ -241,6 +254,8 @@ func collectEntries(paths []string, fold bool) ([]entry, bool) {
 	return ents, ok
 }
 
+// sortEntries sorts entries according to fields.
+// If fields is empty, it sorts by name in ascending order.
 func sortEntries(entries []entry, fields sortFields) {
 	if len(fields) == 0 {
 		fields = sortFields{{key: nameKey}}
@@ -250,6 +265,8 @@ func sortEntries(entries []entry, fields sortFields) {
 	})
 }
 
+// compareEntries compares a and b by fields in order.
+// It stops at the first difference.
 func compareEntries(a, b entry, fields sortFields) int {
 	for _, field := range fields {
 		var n int
