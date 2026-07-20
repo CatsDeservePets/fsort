@@ -103,21 +103,25 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	args := flag.Args()
-	// Expand globs before -C, as a proper shell would.
-	if runtime.GOOS == "windows" {
-		args = expandGlobs(args)
-	}
-
 	delim := "\n"
 	if *zero {
 		delim = "\x00"
 	}
 
-	paths, err := inputPaths(args, os.Stdin, delim)
-	if err != nil {
-		log.Fatal(err)
+	paths := flag.Args()
+	// Expand globs before -C, as a proper shell would.
+	if runtime.GOOS == "windows" {
+		paths = expandGlobs(paths)
 	}
+
+	if len(paths) == 0 {
+		var err error
+		paths, err = readPaths(os.Stdin, delim)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// An empty input is already sorted.
 	if len(paths) == 0 {
 		return
 	}
@@ -154,13 +158,8 @@ func expandGlobs(args []string) []string {
 	return out
 }
 
-// inputPaths returns args, if any.
-// Otherwise, it reads paths from r, using delim as the separator.
-func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
-	if len(args) > 0 {
-		return args, nil
-	}
-
+// readPaths reads paths from r, using delim as the separator.
+func readPaths(r io.Reader, delim string) ([]string, error) {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -175,7 +174,6 @@ func inputPaths(args []string, r io.Reader, delim string) ([]string, error) {
 			paths = append(paths, p)
 		}
 	}
-
 	return paths, nil
 }
 
