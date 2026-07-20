@@ -27,6 +27,27 @@ const (
 	mtimeKey
 )
 
+func parseSortKey(s string) (sortKey, error) {
+	switch strings.ToLower(s) {
+	case "name":
+		return nameKey, nil
+	case "path":
+		return pathKey, nil
+	case "ext", "extension":
+		return extKey, nil
+	case "type":
+		return typeKey, nil
+	case "perm", "permission":
+		return permKey, nil
+	case "size":
+		return sizeKey, nil
+	case "time", "mtime":
+		return mtimeKey, nil
+	default:
+		return 0, errors.New("must be name, path, extension, type, perm, size, or time")
+	}
+}
+
 // A sortField holds a [sortKey] and its direction.
 type sortField struct {
 	key        sortKey // [entry] attribute to compare
@@ -40,26 +61,10 @@ type sortFields []sortField
 // If desc is true, the field sorts in descending order.
 // add returns an error if name is invalid or specifies a key already used.
 func (f *sortFields) add(name string, desc bool) error {
-	var key sortKey
-	switch name {
-	case "name":
-		key = nameKey
-	case "path":
-		key = pathKey
-	case "ext", "extension":
-		key = extKey
-	case "type":
-		key = typeKey
-	case "perm", "permission":
-		key = permKey
-	case "size":
-		key = sizeKey
-	case "time", "mtime":
-		key = mtimeKey
-	default:
-		return errors.New("must be name, path, extension, type, perm, size, or time")
+	key, err := parseSortKey(name)
+	if err != nil {
+		return err
 	}
-
 	for _, field := range *f {
 		if field.key == key {
 			return errors.New("key already specified")
