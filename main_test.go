@@ -6,6 +6,49 @@ import (
 	"testing"
 )
 
+func TestParseSortKey(t *testing.T) {
+	tests := []struct {
+		input string
+		want  sortKey
+	}{
+		// Canonical names.
+		{"name", nameKey},
+		{"path", pathKey},
+		{"extension", extKey},
+		{"type", typeKey},
+		{"perm", permKey},
+		{"size", sizeKey},
+		{"time", mtimeKey},
+
+		// Aliases.
+		{"ext", extKey},
+		{"permission", permKey},
+		{"mtime", mtimeKey},
+
+		// Case-insensitive matching.
+		{"NaMe", nameKey},
+	}
+
+	for _, test := range tests {
+		got, err := parseSortKey(test.input)
+		if err != nil {
+			t.Errorf("parseSortKey(%q) returned unexpected error: %v", test.input, err)
+			continue
+		}
+		if got != test.want {
+			t.Errorf("parseSortKey(%q) = %v, want %v", test.input, got, test.want)
+		}
+	}
+}
+
+func TestParseSortKeyError(t *testing.T) {
+	for _, input := range []string{"", "unknown"} {
+		if _, err := parseSortKey(input); err == nil {
+			t.Errorf("parseSortKey(%q) error = nil, want non-nil", input)
+		}
+	}
+}
+
 func TestReadPaths(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -55,8 +98,7 @@ func TestReadPaths(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := readPaths(strings.NewReader(test.input), test.delim)
 			if err != nil {
-				t.Errorf("readPaths(%q, %q) error = %v", test.input, test.delim, err)
-				return
+				t.Fatalf("readPaths(%q, %q) returned unexpected error: %v", test.input, test.delim, err)
 			}
 			if !slices.Equal(got, test.want) {
 				t.Errorf("readPaths(%q, %q) = %v, want %v", test.input, test.delim, got, test.want)
