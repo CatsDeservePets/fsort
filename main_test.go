@@ -49,6 +49,45 @@ func TestParseSortKeyError(t *testing.T) {
 	}
 }
 
+func TestSortFieldsAdd(t *testing.T) {
+	var got sortFields
+
+	if err := got.add("path", false); err != nil {
+		t.Fatalf(`sortFields.add("path", false) returned unexpected error: %v`, err)
+	}
+	if err := got.add("size", true); err != nil {
+		t.Fatalf(`sortFields.add("size", true) returned unexpected error: %v`, err)
+	}
+
+	want := sortFields{
+		{key: pathKey},
+		{key: sizeKey, descending: true},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("fields after add calls = %v, want %v", got, want)
+	}
+}
+
+func TestSortFieldsAddError(t *testing.T) {
+	initial := sortFields{
+		{key: pathKey},
+		{key: sizeKey, descending: true},
+	}
+
+	for _, name := range []string{"size", "unknown"} {
+		got := slices.Clone(initial)
+
+		if err := got.add(name, false); err == nil {
+			t.Errorf("sortFields.add(%q, false) error = nil, want non-nil",
+				name)
+		}
+		if !slices.Equal(got, initial) {
+			t.Errorf("sortFields.add(%q, false) changed fields to %v, want %v",
+				name, got, initial)
+		}
+	}
+}
+
 func TestReadPaths(t *testing.T) {
 	tests := []struct {
 		name  string
